@@ -30,7 +30,26 @@ const SP = (() => {
   let _online  = true;
 
   // ── MSAL bootstrap ───────────────────────────────────────────────────────
+  function demoMode() {
+    _online = false;
+    document.getElementById('sp-overlay')?.classList.add('hidden');
+    setSyncStatus('offline', 'Demo mode');
+    renderAll();
+  }
+
   function init() {
+    // Auto-engage demo mode when running from the local filesystem
+    if (location.protocol === 'file:' || new URLSearchParams(location.search).get('demo') === '1') {
+      demoMode();
+      return;
+    }
+
+    // Gracefully handle missing MSAL (CDN blocked, offline, etc.)
+    if (typeof msal === 'undefined') {
+      _showError('Microsoft Sign-In library failed to load. Check your internet connection, or open with ?demo=1 to preview with seed data.');
+      return;
+    }
+
     msalApp = new msal.PublicClientApplication({
       auth: {
         clientId: CLIENT_ID,
@@ -87,11 +106,12 @@ const SP = (() => {
   }
 
   async function _afterSignIn() {
-    document.getElementById('sp-overlay').classList.add('hidden');
-    document.getElementById('user-name').textContent =
-      (account.name || account.username || '').split(' ')[0];
+    document.getElementById('sp-overlay')?.classList.add('hidden');
+    const unEl = document.getElementById('user-name');
+    if (unEl) unEl.textContent = (account.name || account.username || '').split(' ')[0];
     setSyncStatus('syncing', 'Loading…');
-    document.getElementById('sp-loading').style.display = 'block';
+    const ldEl = document.getElementById('sp-loading');
+    if (ldEl) ldEl.style.display = 'block';
     try {
       await _resolveSiteId();
       await _resolveListIds();
@@ -104,7 +124,8 @@ const SP = (() => {
       _loadFromCache();
       renderAll();
     }
-    document.getElementById('sp-loading').style.display = 'none';
+    const ldEl2 = document.getElementById('sp-loading');
+    if (ldEl2) ldEl2.style.display = 'none';
   }
 
   // ── Token acquisition ─────────────────────────────────────────────────
@@ -622,6 +643,6 @@ const SP = (() => {
   }
 
   // ── Public API ────────────────────────────────────────────────────────
-  return { init, signIn, signOut, showUserMenu, scheduleSave,
+  return { init, demoMode, signIn, signOut, showUserMenu, scheduleSave,
            loadFromSharePoint, setSyncStatus, isOnline: ()=>_online };
 })();
